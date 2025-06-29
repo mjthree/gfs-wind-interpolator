@@ -125,10 +125,11 @@ def find_latest_available_run_hour(forecast_hour, model_type):
             base_url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod"
             file_url = f"{base_url}/gfs.{file_date}/{run_hour:02d}/{filename}"
             try:
-                import requests
-                r = requests.head(file_url, timeout=5)
-                if r.status_code == 200:
-                    return file_date, run_hour, filename
+                from urllib.request import Request, urlopen
+                req = Request(file_url, method="HEAD")
+                with urlopen(req, timeout=5) as r:
+                    if r.status == 200:
+                        return file_date, run_hour, filename
             except Exception:
                 continue
         # Fallback to current hour if nothing found
@@ -150,10 +151,11 @@ def find_latest_available_run_hour(forecast_hour, model_type):
             base_url = "https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod"
             file_url = f"{base_url}/hrrr.{file_date}/conus/{filename}"
             try:
-                import requests
-                r = requests.head(file_url, timeout=5)
-                if r.status_code == 200:
-                    return file_date, run_hour, filename
+                from urllib.request import Request, urlopen
+                req = Request(file_url, method="HEAD")
+                with urlopen(req, timeout=5) as r:
+                    if r.status == 200:
+                        return file_date, run_hour, filename
             except Exception:
                 continue
         # Fallback to current hour if nothing found
