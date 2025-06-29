@@ -327,6 +327,26 @@ The interpolated data can be used for:
 
 ---
 
+## 🔬 Raw Data Viewer (Testing Only)
+
+For debugging and testing purposes, a separate script `raw_data_viewer.py` is included that shows all raw pressure level data without interpolation.
+
+### Features:
+- **All Variables**: Displays every available variable (wind, temperature, humidity, etc.)
+- **All Pressure Levels**: Shows data at every pressure level in the model
+- **No Interpolation**: Raw values exactly as provided by NOAA
+- **Model Selection**: Choose between HRRR and GFS for CONUS locations
+- **CSV Export**: Save complete raw data to CSV files
+
+### Usage:
+```bash
+python raw_data_viewer.py
+```
+
+**Note**: This script is for testing, debugging, and data analysis only. For operational wind profiling, use `wind_profiler.py` which provides clean, interpolated output.
+
+---
+
 ## 🛠️ Troubleshooting
 
 ### Common Issues
@@ -405,3 +425,10 @@ For questions or issues:
   - It uses linear interpolation (via `scipy.interpolate.interp1d`) to estimate wind speed and direction at each 1,000-foot level, based on the values at the original pressure levels.
 - **Result:**
   - You get a smooth, regularly spaced wind profile (every 1,000 feet) that is easy to read and use for aviation, ballooning, UAVs, and more.
+
+## 📁 Repository Files
+
+- **`wind_profiler.py`**: Main wind profiling script (interpolated output)
+- **`raw_data_viewer.py`**: Raw data viewer for testing/debugging
+- **`README.md`**: This documentation
+- **`.gitignore`**: Excludes data files and system files from version control
