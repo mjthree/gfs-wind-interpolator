@@ -42,8 +42,10 @@ For operations requiring atmospheric wind data, it may be advantageous to source
 
 ### Python Dependencies
 
+Install all required Python packages using the provided `requirements.txt` file:
+
 ```bash
-pip install cfgrib xarray pandas numpy scipy
+pip install -r requirements.txt
 ```
 
 ### System Dependencies
@@ -83,7 +85,7 @@ source gfs_env/bin/activate
 gfs_env\Scripts\activate
 
 # Install dependencies
-pip install cfgrib xarray pandas numpy scipy
+pip install -r requirements.txt
 ```
 
 **Using conda:**
@@ -107,10 +109,10 @@ After setting up your environment, verify the installation:
 python --version
 
 # Check installed packages
-pip list | grep -E "(cfgrib|xarray|pandas|numpy|scipy)"
+pip list | grep -E "(cfgrib|xarray|pandas|numpy|scipy|requests)"
 
 # Test import
-python -c "import cfgrib, xarray, pandas, numpy, scipy; print('All packages imported successfully!')"
+python -c "import cfgrib, xarray, pandas, numpy, scipy, requests; print('All packages imported successfully!')"
 ```
 
 ---
@@ -121,7 +123,7 @@ python -c "import cfgrib, xarray, pandas, numpy, scipy; print('All packages impo
 2. **Set up Python environment** (see Environment Setup above)
 3. **Install Python dependencies:**
    ```bash
-   pip install cfgrib xarray pandas numpy scipy
+   pip install -r requirements.txt
    ```
 4. **Install system dependencies** (see above for your OS)
 5. **Run the script:**
@@ -362,12 +364,12 @@ python raw_data_viewer.py
 - Check Python environment has all required packages
 
 **Import errors:**
-- Verify all dependencies are installed: `pip list | grep -E "(cfgrib|xarray|pandas|numpy|scipy)"`
+- Verify all dependencies are installed: `pip list | grep -E "(cfgrib|xarray|pandas|numpy|scipy|requests)"`
 - Consider using a virtual environment
 
 **Environment issues:**
 - Ensure you're in the correct virtual environment: `which python`
-- Reinstall dependencies if needed: `pip install --upgrade cfgrib xarray pandas numpy scipy`
+- Reinstall dependencies if needed: `pip install --upgrade -r requirements.txt`
 
 ### Performance Tips
 
@@ -435,4 +437,5 @@ This software is provided "as is," without warranty of any kind, express or impl
 - **`wind_profiler.py`**: Main wind profiling script (interpolated output)
 - **`raw_data_viewer.py`**: Raw data viewer for testing/debugging
 - **`README.md`**: This documentation
+- **`requirements.txt`**: Python dependencies list
 - **`.gitignore`**: Excludes data files and system files from version control
