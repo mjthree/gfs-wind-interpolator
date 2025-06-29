@@ -21,10 +21,16 @@ import cfgrib
 import numpy as np
 import pandas as pd
 from scipy.interpolate import interp1d
+import re
+import time
 
 # Suppress all warnings and debug output
 warnings.filterwarnings('ignore')
 os.environ['CFGRIB_DEBUG'] = '0'
+
+class NoGFSDataError(Exception):
+    """Exception raised when no GFS forecast data is available."""
+    pass
 
 def is_within_conus(lat, lon):
     """
@@ -42,21 +48,17 @@ def is_within_conus(lat, lon):
 def get_available_forecast_hours(model_type):
     """
     Returns a list of available forecast hours for the specified model.
-    
     Args:
-        model_type (str): 'hrrr' or 'gfs'
-        
+        model_type (str): 'hrrr', 'rap', 'nam', or 'gfs'
     Returns:
         list: Available forecast hours
     """
     if model_type == 'hrrr':
-        # HRRR provides forecasts out to 18 hours with 1-hour resolution
-        return list(range(0, 19))
+        return list(range(0, 19))  # 0-18 hours, hourly
+    elif model_type == 'rap':
+        return list(range(0, 22))  # 0-21 hours, hourly
     elif model_type == 'gfs':
-        # GFS provides forecasts out to 384 hours (16 days) with different intervals
-        # Hours 0-120: every 3 hours
         hours_3h = list(range(0, 121, 3))
-        # Hours 126-384: every 6 hours  
         hours_6h = list(range(126, 385, 6))
         return hours_3h + hours_6h
     else:
@@ -68,7 +70,7 @@ def check_forecast_availability(forecast_hour, model_type):
     
     Args:
         forecast_hour (int): Forecast hour to check
-        model_type (str): 'hrrr' or 'gfs'
+        model_type (str): 'hrrr', 'rap', 'nam', or 'gfs'
         
     Returns:
         bool: True if available, False otherwise
@@ -87,6 +89,24 @@ def check_forecast_availability(forecast_hour, model_type):
             filename = f"hrrr.t{run_hour_str}z.wrfsfcf{forecast_hour:02d}.grib2"
             file_url = base_url + filename
             
+            try:
+                request = urllib.request.Request(file_url, method="HEAD")
+                with urllib.request.urlopen(request, timeout=5) as response:
+                    if 200 <= response.status < 400:
+                        return True
+            except Exception:
+                continue
+        return False
+    elif model_type == 'rap':
+        # RAP runs hourly, similar to HRRR
+        for hours_back in range(3):
+            check_time = now - timedelta(hours=hours_back)
+            run_hour = check_time.hour
+            run_hour_str = f"{run_hour:02d}"
+            date_str = check_time.strftime("%Y%m%d")
+            base_url = f"https://nomads.ncep.noaa.gov/pub/data/nccf/com/rap/prod/rap.{date_str}/"
+            filename = f"rap.t{run_hour_str}z.awp130pgrbf{forecast_hour:02d}.grib2"
+            file_url = base_url + filename
             try:
                 request = urllib.request.Request(file_url, method="HEAD")
                 with urllib.request.urlopen(request, timeout=5) as response:
@@ -121,38 +141,19 @@ def check_forecast_availability(forecast_hour, model_type):
 def get_immediately_available_hours(model_type):
     """
     Returns a list of forecast hours that are immediately available from NOAA.
-    
     Args:
-        model_type (str): 'hrrr' or 'gfs'
-        
+        model_type (str): 'hrrr', 'rap', 'nam', or 'gfs'
     Returns:
         list: Available forecast hours that can be downloaded now
     """
     print(f"Checking available forecast hours from NOAA {model_type.upper()}...")
     all_hours = get_available_forecast_hours(model_type)
     available_hours = []
-
-    if model_type == 'hrrr':
-        # For HRRR, check all hours but be more lenient with availability
-        for hour in all_hours:
-            if check_forecast_availability(hour, model_type):
-                available_hours.append(hour)
-            else:
-                # For HRRR, if we can't find a specific hour, stop checking
-                # as HRRR data becomes available sequentially
-                break
-    else:  # GFS
-        # For GFS, be more lenient and check more hours since data availability varies
-        for hour in all_hours[:20]:  # Check first 20 hours
-            if check_forecast_availability(hour, model_type):
-                available_hours.append(hour)
-            else:
-                # For GFS, continue checking as some hours might be available from different runs
-                continue
-
+    for hour in all_hours:
+        if check_forecast_availability(hour, model_type):
+            available_hours.append(hour)
     if 0 not in available_hours:
         available_hours.insert(0, 0)
-
     return available_hours
 
 def find_available_run_hour(forecast_hour, model_type):
@@ -161,7 +162,7 @@ def find_available_run_hour(forecast_hour, model_type):
     
     Args:
         forecast_hour (int): Forecast hour needed
-        model_type (str): 'hrrr' or 'gfs'
+        model_type (str): 'hrrr', 'rap', 'nam', or 'gfs'
         
     Returns:
         tuple: (run_hour, date_str) for the available run
@@ -187,7 +188,23 @@ def find_available_run_hour(forecast_hour, model_type):
                 continue
         # If no specific forecast hour found, return the most recent run hour
         return now.hour, now.strftime("%Y%m%d")
-    else:  # GFS
+    elif model_type == 'rap':
+        for hours_back in range(6):
+            check_time = now - timedelta(hours=hours_back)
+            run_hour = check_time.hour
+            run_hour_str = f"{run_hour:02d}"
+            date_str = check_time.strftime("%Y%m%d")
+            base_url = f"https://nomads.ncep.noaa.gov/pub/data/nccf/com/rap/prod/rap.{date_str}/"
+            filename = f"rap.t{run_hour_str}z.awp130pgrbf{forecast_hour:02d}.grib2"
+            file_url = base_url + filename
+            try:
+                response = urllib.request.urlopen(file_url, timeout=5)
+                response.close()
+                return run_hour, date_str
+            except:
+                continue
+        return now.hour, now.strftime("%Y%m%d")
+    elif model_type == 'gfs':
         # Check multiple recent run hours for GFS
         for hours_back in range(0, 48, 6):  # Check last 48 hours of runs
             check_time = now - timedelta(hours=hours_back)
@@ -207,11 +224,13 @@ def find_available_run_hour(forecast_hour, model_type):
         # If no specific forecast hour found, return the most recent run hour
         run_hour = now.hour - (now.hour % 6)
         return run_hour, now.strftime("%Y%m%d")
+    else:
+        raise ValueError(f"Unknown model type: {model_type}")
 
 def get_user_input():
     """
     Prompts user for location coordinates, maximum elevation, and forecast hour.
-    Automatically determines whether to use HRRR or GFS based on location.
+    Automatically determines whether to use HRRR, RAP, NAM, or GFS based on location.
     
     Returns:
         tuple: (latitude, longitude, max_elevation_ft, forecast_hour, model_type)
@@ -239,25 +258,123 @@ def get_user_input():
         except ValueError:
             print("Please enter a valid number.")
 
-    # Determine which model to use based on location
-    if is_within_conus(lat, lon):
-        model_type = 'hrrr'
-        print(f"\nLocation is within CONUS - using HRRR (High-Resolution Rapid Refresh)")
-        print("HRRR provides 3km resolution data with hourly updates (0-18 hours) for the continental US only.")
-    else:
-        model_type = 'gfs'
-        print(f"\nLocation is outside CONUS (including Hawaii, Alaska, and overseas) - using GFS (Global Forecast System)")
-        print("GFS provides global coverage with 25km resolution (0-384 hours)")
-
+    # Prompt for maximum elevation before model selection so it is always defined
     while True:
         try:
-            max_elevation = int(input("Enter maximum elevation in feet (1000 to 50000): "))
-            if 1000 <= max_elevation <= 50000:
+            max_elevation_ft = int(input("Enter maximum elevation in feet (1000 to 50000): "))
+            if 1000 <= max_elevation_ft <= 50000:
                 break
             else:
                 print("Maximum elevation must be between 1000 and 50000 feet.")
         except ValueError:
             print("Please enter a valid number.")
+
+    # Determine which model to use based on location
+    if is_within_conus(lat, lon):
+        print(f"\nLocation is within CONUS. Choose model:")
+        print("1. HRRR (High-Resolution Rapid Refresh, up to ~34,000 ft)")
+        print("2. RAP (Rapid Refresh, up to ~39,000 ft)")
+        print("3. GFS (Global Forecast System, up to ~50,000+ ft)")
+        print("4. Auto (Most Current Available)")
+        while True:
+            model_choice = input("Select model (1=HRRR, 2=RAP, 3=GFS, 4=Auto): ").strip()
+            if model_choice == '1':
+                model_type = 'hrrr'
+                print("Model: HRRR (High-Resolution Rapid Refresh)")
+                print("Coverage: Continental US")
+                break
+            elif model_choice == '2':
+                model_type = 'rap'
+                print("Model: RAP (Rapid Refresh)")
+                print("Coverage: Continental US and nearby regions")
+                break
+            elif model_choice == '3':
+                model_type = 'gfs'
+                print("Model: GFS (Global Forecast System)")
+                print("Coverage: Global")
+                break
+            elif model_choice == '4':
+                # Auto mode: check all models for freshest data using only HEAD requests
+                print("Auto mode: Checking all models for most current available forecast...")
+                from datetime import datetime, timedelta, timezone
+                import urllib.request
+                now = datetime.utcnow().replace(tzinfo=timezone.utc)
+                freshest_model = None
+                freshest_time = None
+                freshest_info = None
+                for m in ['hrrr', 'rap', 'gfs']:
+                    available_hours = get_immediately_available_hours(m)
+                    if not available_hours:
+                        continue
+                    run_hour, date_str = find_available_run_hour(0, m)  # Use 0 as a placeholder
+                    run_hour_str = f"{run_hour:02d}"
+                    if m == 'hrrr':
+                        base_url = f"https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/hrrr.{date_str}/conus/"
+                        filename_template = "hrrr.t{run_hour_str}z.wrfsfcf{forecast_hour:02d}.grib2"
+                    elif m == 'rap':
+                        base_url = f"https://nomads.ncep.noaa.gov/pub/data/nccf/com/rap/prod/rap.{date_str}/"
+                        filename_template = "rap.t{run_hour_str}z.awp130pgrbf{forecast_hour:02d}.grib2"
+                    elif m == 'gfs':
+                        base_url = f"https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.{date_str}/{run_hour_str}/atmos/"
+                        filename_template = "gfs.t{run_hour_str}z.pgrb2.0p25.f{forecast_hour:03d}"
+                    else:
+                        continue
+                    # Find the forecast hour whose valid time is closest to now but not after
+                    best_fh = None
+                    best_valid_time = None
+                    for fh in available_hours:
+                        valid_time = datetime.strptime(date_str, '%Y%m%d').replace(tzinfo=timezone.utc) + timedelta(hours=run_hour + fh)
+                        if valid_time <= now and (best_valid_time is None or valid_time > best_valid_time):
+                            best_fh = fh
+                            best_valid_time = valid_time
+                    if best_fh is None:
+                        continue
+                    filename = filename_template.format(run_hour_str=run_hour_str, forecast_hour=best_fh)
+                    file_url = base_url + filename
+                    # HEAD request only
+                    try:
+                        request = urllib.request.Request(file_url, method="HEAD")
+                        with urllib.request.urlopen(request, timeout=5) as response:
+                            if 200 <= response.status < 400:
+                                if freshest_time is None or best_valid_time > freshest_time:
+                                    freshest_time = best_valid_time
+                                    freshest_model = m
+                                    freshest_info = (best_fh, run_hour, date_str, filename, base_url)
+                    except Exception:
+                        continue
+                if freshest_model is None:
+                    print("No available forecast found for any model. Try again later.")
+                    exit(1)
+                model_type = freshest_model
+                forecast_hour, run_hour, date_str, filename, base_url = freshest_info
+                print(f"Auto-selected model: {model_type.upper()} (valid for {freshest_time.strftime('%Y-%m-%d %H:%MZ')})")
+                # Download only the selected file
+                file_url = base_url + filename
+                print(f"Downloading {filename} from NOAA...")
+                import sys
+                import time
+                def reporthook(block_num, block_size, total_size):
+                    downloaded = block_num * block_size
+                    percent = min(downloaded / total_size * 100, 100) if total_size else 0
+                    sys.stdout.write(f"\rDownloaded: {downloaded/1024/1024:.2f} MB / {total_size/1024/1024:.2f} MB ({percent:.1f}%)")
+                    sys.stdout.flush()
+                start_time = time.time()
+                urllib.request.urlretrieve(file_url, filename, reporthook=reporthook)
+                end_time = time.time()
+                print()
+                if os.path.exists(filename):
+                    file_size = os.path.getsize(filename)
+                    elapsed = end_time - start_time
+                    speed = file_size / 1024 / 1024 / elapsed if elapsed > 0 else 0
+                    print(f"Download complete. File size: {file_size/1024/1024:.2f} MB. Time: {elapsed:.1f}s. Speed: {speed:.2f} MB/s.")
+                # Return all info needed for main()
+                return lat, lon, max_elevation_ft, forecast_hour, model_type, filename, run_hour, date_str
+            else:
+                print("Please enter 1, 2, 3, or 4.")
+    else:
+        model_type = 'gfs'
+        print(f"\nLocation is outside CONUS (including Hawaii, Alaska, and overseas) - using GFS (Global Forecast System)")
+        print("GFS provides global coverage with 25km resolution (0-384 hours)")
 
     available_hours = get_immediately_available_hours(model_type)
     print(f"\nImmediately available forecast hours: {', '.join(map(str, available_hours))}")
@@ -265,6 +382,9 @@ def get_user_input():
     if model_type == 'hrrr':
         print("Note: More forecast hours may become available as HRRR data is processed.")
         print("0 = Current conditions, 1 = 1 hour from now, 3 = 3 hours from now, etc.")
+    elif model_type == 'rap':
+        print("Note: More forecast hours may become available as RAP data is processed.")
+        print("0 = Current conditions, 1 = 1 hour from now, 21 = 21 hours from now, etc.")
     else:
         print("Note: More forecast hours may become available as GFS data is processed.")
         print("0 = Current conditions, 3 = 3 hours from now, 24 = 24 hours from now, etc.")
@@ -272,7 +392,39 @@ def get_user_input():
     while True:
         try:
             forecast_hour = int(input("Enter forecast hour: "))
-            if forecast_hour in available_hours:
+            if forecast_hour == 0 and model_type == 'gfs':
+                # For GFS, 0 means search backwards for the most recent available file
+                from datetime import datetime, timedelta
+                now = datetime.utcnow()
+                found = False
+                for hours_back in range(0, 25, 6):  # Go back up to 24 hours in 6-hour steps
+                    check_time = now - timedelta(hours=hours_back)
+                    run_hour = check_time.hour - (check_time.hour % 6)
+                    run_hour_str = f"{run_hour:02d}"
+                    date_str = check_time.strftime("%Y%m%d")
+                    for fh in range(0, 85, 3):  # GFS forecast hours: 0, 3, ..., 84
+                        base_url = f"https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.{date_str}/"
+                        filename = f"gfs.t{run_hour_str}z.pgrb2.0p25.f{fh:03d}"
+                        file_url = base_url + filename
+                        try:
+                            request = urllib.request.Request(file_url, method="HEAD")
+                            with urllib.request.urlopen(request, timeout=5) as response:
+                                if 200 <= response.status < 400:
+                                    forecast_hour = fh
+                                    print(f"Using GFS run {date_str} {run_hour_str}Z, forecast hour {forecast_hour}")
+                                    found = True
+                                    break
+                        except Exception:
+                            continue
+                    if found:
+                        break
+                if not found:
+                    print("No GFS forecast files are currently available (checked last 24 hours).")
+                    print("Please try another model or run the script again later.")
+                    print("Exiting...")
+                    raise NoGFSDataError
+                break
+            elif forecast_hour in available_hours:
                 break
             else:
                 print(f"Forecast hour {forecast_hour} is not available yet.")
@@ -280,16 +432,19 @@ def get_user_input():
                 print("Try a shorter forecast time or wait for more data to be processed.")
         except ValueError:
             print("Please enter a valid number.")
+        except EOFError:
+            print("\nInput interrupted. Exiting...")
+            raise NoGFSDataError
 
     forecast_time = get_forecast_time(forecast_hour, model_type)
 
     print(f"\nLocation: {lat:.4f}°N, {lon:.4f}°E")
     print(f"Model: {model_type.upper()}")
-    print(f"Maximum elevation: {max_elevation:,} feet")
+    print(f"Maximum elevation: {max_elevation_ft:,} feet")
     print(f"Forecast hour: {forecast_hour} ({forecast_time})")
     print("=" * 40)
 
-    return lat, lon, max_elevation, forecast_hour, model_type
+    return lat, lon, max_elevation_ft, forecast_hour, model_type
 
 def get_forecast_time(forecast_hour, model_type):
     """
@@ -297,7 +452,7 @@ def get_forecast_time(forecast_hour, model_type):
     
     Args:
         forecast_hour (int): Forecast hour
-        model_type (str): 'hrrr' or 'gfs'
+        model_type (str): 'hrrr', 'rap', 'nam', or 'gfs'
         
     Returns:
         str: Human-readable forecast time
@@ -315,72 +470,78 @@ def download_forecast_file(forecast_hour, model_type):
     
     Args:
         forecast_hour (int): Forecast hour
-        model_type (str): 'hrrr' or 'gfs'
+        model_type (str): 'hrrr', 'rap', 'nam', or 'gfs'
         
     Returns:
-        str: Filename of the downloaded/cached GRIB2 file
+        tuple: (filename, run_hour, date_str)
     """
-    # Find the appropriate run hour for this forecast
     run_hour, date_str = find_available_run_hour(forecast_hour, model_type)
     run_hour_str = f"{run_hour:02d}"
     
     if model_type == 'hrrr':
         base_url = f"https://nomads.ncep.noaa.gov/pub/data/nccf/com/hrrr/prod/hrrr.{date_str}/conus/"
         filename = f"hrrr.t{run_hour_str}z.wrfsfcf{forecast_hour:02d}.grib2"
-    else:  # GFS
+    elif model_type == 'rap':
+        base_url = f"https://nomads.ncep.noaa.gov/pub/data/nccf/com/rap/prod/rap.{date_str}/"
+        filename = f"rap.t{run_hour_str}z.awp130pgrbf{forecast_hour:02d}.grib2"
+    elif model_type == 'gfs':
         base_url = f"https://nomads.ncep.noaa.gov/pub/data/nccf/com/gfs/prod/gfs.{date_str}/{run_hour_str}/atmos/"
         filename = f"gfs.t{run_hour_str}z.pgrb2.0p25.f{forecast_hour:03d}"
+    else:
+        raise ValueError(f"Unknown model type: {model_type}")
     
     file_url = base_url + filename
 
+    # Final HEAD check before download
+    try:
+        request = urllib.request.Request(file_url, method="HEAD")
+        with urllib.request.urlopen(request, timeout=5) as response:
+            if not (200 <= response.status < 400):
+                print(f"Forecast file {filename} is not available (HTTP {response.status}). Please select another forecast hour.")
+                return None, None, None
+            total_size = int(response.headers.get('Content-Length', 0))
+    except Exception as e:
+        print(f"Forecast file {filename} is not available ({e}). Please select another forecast hour.")
+        return None, None, None
+
     # Check if file exists and ask user preference
     if os.path.exists(filename):
-        # Get file modification time
-        now = datetime.now(timezone.utc)
-        file_mtime = datetime.fromtimestamp(os.path.getmtime(filename), tz=timezone.utc)
-        file_age = now - file_mtime
-        
-        # Format age for display
-        if file_age.total_seconds() < 3600:  # Less than 1 hour
-            age_str = f"{int(file_age.total_seconds() / 60)} minutes ago"
-        elif file_age.total_seconds() < 86400:  # Less than 1 day
-            age_str = f"{int(file_age.total_seconds() / 3600)} hours ago"
-        else:
-            age_str = f"{int(file_age.total_seconds() / 86400)} days ago"
-        
-        print(f"Found cached file: {filename}")
-        print(f"File age: {age_str}")
-        print(f"File size: {os.path.getsize(filename) / (1024*1024):.1f} MB")
-        
         while True:
             choice = input("Use cached file or download fresh? (c/d): ").lower().strip()
-            if choice in ['c', 'd']:
+            if choice == 'c':
+                print(f"Using cached file: {filename}\n")
+                return filename, run_hour, date_str
+            elif choice == 'd':
+                print(f"Downloading fresh file: {filename}")
+                try:
+                    os.remove(filename)
+                except:
+                    pass
                 break
             else:
                 print("Please enter 'c' for cached file or 'd' for fresh download.")
-        
-        if choice == 'c':
-            print(f"Using cached file: {filename}\n")
-            return filename
-        else:
-            print(f"Downloading fresh file: {filename}")
-            # Remove old file before downloading
-            try:
-                os.remove(filename)
-            except:
-                pass
-
-    # Download file if it doesn't exist or user chose fresh download
+    # Download file with progress
     print(f"Downloading {filename} from NOAA...")
     try:
-        urllib.request.urlretrieve(file_url, filename)
-        print("Download complete.\n")
+        def reporthook(block_num, block_size, total_size):
+            downloaded = block_num * block_size
+            percent = min(downloaded / total_size * 100, 100) if total_size else 0
+            sys.stdout.write(f"\rDownloaded: {downloaded/1024/1024:.2f} MB / {total_size/1024/1024:.2f} MB ({percent:.1f}%)")
+            sys.stdout.flush()
+        start_time = time.time()
+        urllib.request.urlretrieve(file_url, filename, reporthook=reporthook)
+        end_time = time.time()
+        print()
+        if os.path.exists(filename):
+            file_size = os.path.getsize(filename)
+            elapsed = end_time - start_time
+            speed = file_size / 1024 / 1024 / elapsed if elapsed > 0 else 0
+            print(f"Download complete. File size: {file_size/1024/1024:.2f} MB. Time: {elapsed:.1f}s. Speed: {speed:.2f} MB/s.")
     except Exception as e:
         print(f"Failed to download {filename}: {e}")
         print("This forecast hour may not be available yet. Try a shorter forecast time.")
-        exit(1)
-
-    return filename
+        return None, None, None
+    return filename, run_hour, date_str
 
 def load_forecast_data(filename, model_type):
     """
@@ -388,7 +549,7 @@ def load_forecast_data(filename, model_type):
     
     Args:
         filename (str): Path to the GRIB2 file
-        model_type (str): 'hrrr' or 'gfs'
+        model_type (str): 'hrrr', 'rap', 'nam', or 'gfs'
         
     Returns:
         xarray.Dataset: Loaded dataset with wind data
@@ -398,12 +559,14 @@ def load_forecast_data(filename, model_type):
     sys.stderr = open(os.devnull, 'w')
     
     try:
-        # Load wind components from forecast data
-        ds = cfgrib.open_dataset(filename, filter_by_keys={
-            "typeOfLevel": "isobaricInhPa",
-            "shortName": ["u", "v"]
-        })
-        return ds
+        if model_type in ['hrrr', 'gfs', 'rap']:
+            ds = cfgrib.open_dataset(filename, filter_by_keys={
+                "typeOfLevel": "isobaricInhPa",
+                "shortName": ["u", "v"]
+            })
+            return ds
+        else:
+            raise ValueError(f"Unknown model type: {model_type}")
     except Exception as e:
         print(f"Error loading {model_type.upper()} data: {e}")
         if model_type == 'hrrr':
@@ -416,11 +579,21 @@ def load_forecast_data(filename, model_type):
 
 def main():
     """Entry point for command-line execution."""
-    # Get user input for location, elevation, and forecast hour
-    lat, lon, max_elevation_ft, forecast_hour, model_type = get_user_input()
-
-    # Step 1: Download the specified forecast file
-    filename = download_forecast_file(forecast_hour, model_type)
+    try:
+        # Get user input for location, elevation, and forecast hour
+        user_input = get_user_input()
+        # If auto mode, get all info directly
+        if len(user_input) == 8:
+            lat, lon, max_elevation_ft, forecast_hour, model_type, filename, run_hour, run_date_str = user_input
+        else:
+            lat, lon, max_elevation_ft, forecast_hour, model_type = user_input
+            filename, run_hour, run_date_str = download_forecast_file(forecast_hour, model_type)
+            if filename is None:
+                print("No forecast file available. Exiting.")
+                return
+    except NoGFSDataError:
+        print("Exiting due to unavailable GFS data.")
+        return
 
     # Step 2: Load and parse the GRIB2 file using cfgrib
     print("Processing wind data...")
@@ -485,6 +658,14 @@ def main():
     print(f"Target location: {lat:.4f}°N, {lon:.4f}°E")
     print(f"Nearest grid point: {actual_lat:.4f}°N, {actual_lon:.4f}°E")
     print(f"Grid indices: lat_idx={lat_idx}, lon_idx={lon_idx}")
+
+    # Print valid time in Zulu (UTC)
+    valid_time = None
+    if run_date_str is not None and run_hour is not None:
+        run_date = datetime.strptime(run_date_str, '%Y%m%d')
+        valid_time = run_date.replace(tzinfo=timezone.utc) + timedelta(hours=run_hour + forecast_hour)
+        print(f"\nForecast valid for: {valid_time.strftime('%Y-%m-%d %H:%MZ')} (Zulu/UTC)")
+    valid_time_str = valid_time.strftime('%Y-%m-%d %H:%MZ') if valid_time else 'Unknown'
 
     # Extract wind components at all pressure levels for our location
     levs = ds.isobaricInhPa.values  # Pressure levels in hPa
@@ -552,9 +733,14 @@ def main():
         with open(txt_filename, 'w') as f:
             f.write(f"{model_type.upper()} Wind Profile for {lat:.4f}°N, {lon:.4f}°E\n")
             f.write(f"Forecast: {forecast_time}\n")
+            f.write(f"Valid Zulu Time: {valid_time_str}\n")
             f.write("=" * 60 + "\n")
             f.write(df.to_string(index=False) + "\n")
         print(f"Human-readable results saved to: {txt_filename}")
+        # Add valid Zulu time as a column in CSV
+        df['Valid_Zulu_Time'] = valid_time_str
+        df.to_csv(csv_filename, index=False)
+        print(f"CSV results saved to: {csv_filename}")
 
     # NOTE: This script operates fully offline after the forecast file is downloaded.
     #       No external polling (e.g., from open websites) is required at runtime.
