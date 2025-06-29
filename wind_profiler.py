@@ -87,10 +87,11 @@ def check_forecast_availability(forecast_hour, model_type):
             file_url = base_url + filename
             
             try:
-                response = urllib.request.urlopen(file_url, timeout=5)
-                response.close()
-                return True
-            except:
+                request = urllib.request.Request(file_url, method="HEAD")
+                with urllib.request.urlopen(request, timeout=5) as response:
+                    if 200 <= response.status < 400:
+                        return True
+            except Exception:
                 continue
         return False
     elif model_type == 'gfs':
@@ -106,10 +107,11 @@ def check_forecast_availability(forecast_hour, model_type):
             file_url = base_url + filename
 
             try:
-                response = urllib.request.urlopen(file_url, timeout=10)
-                response.close()
-                return True
-            except:
+                request = urllib.request.Request(file_url, method="HEAD")
+                with urllib.request.urlopen(request, timeout=10) as response:
+                    if 200 <= response.status < 400:
+                        return True
+            except Exception:
                 continue
         return False
     else:
