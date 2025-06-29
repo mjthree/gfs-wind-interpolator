@@ -1,0 +1,18 @@
+HRRR Wind Profile for 40.7128°N, -74.0060°E
+Forecast: Current conditions (0-hour analysis)
+Valid Zulu Time: 2025-06-29 12:00Z
+Altitude Reference: AGL (Above Ground Level)
+Ground Elevation: 1000 feet MSL
+============================================================
+ Altitude_ft_AGL  Wind_Speed_kts  Wind_Direction_deg
+               0        4.327452          300.683910
+            1000        6.994441          296.840252
+            2000        8.447152          285.611698
+            3000        8.684317          266.990536
+            4000        9.047445          252.383503
+            5000        9.862083          252.164848
+            6000       10.676722          251.946193
+            7000       11.491361          251.727538
+            8000       12.305999          251.508884
+            9000       13.022025          251.337297
+           10000       12.987223          251.524080

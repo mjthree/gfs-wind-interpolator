@@ -24,6 +24,16 @@ from scipy.interpolate import interp1d
 import re
 import time
 
+# DTED imports
+try:
+    from pydted import DTED
+    DTED_AVAILABLE = True
+except ImportError:
+    DTED_AVAILABLE = False
+    # Note: pydted is not available on PyPI. For automatic ground elevation lookup,
+    # you can install it from: https://github.com/OpenTopography/pydted
+    # Or use alternative libraries like: https://github.com/OpenTopography/API
+
 # Suppress all warnings and debug output
 warnings.filterwarnings('ignore')
 os.environ['CFGRIB_DEBUG'] = '0'
@@ -44,6 +54,47 @@ def is_within_conus(lat, lon):
     """
     # CONUS coverage: roughly 20°N to 60°N, 140°W to 50°W
     return 20 <= lat <= 60 and -140 <= lon <= -50
+
+def get_ground_elevation(lat, lon):
+    """
+    Gets ground elevation in feet MSL using DTED Level 0 data.
+    
+    Args:
+        lat (float): Latitude in decimal degrees
+        lon (float): Longitude in decimal degrees
+        
+    Returns:
+        float: Ground elevation in feet MSL, or None if DTED not available
+    """
+    if not DTED_AVAILABLE:
+        return None
+    
+    try:
+        # DTED Level 0 provides ~1km resolution terrain data
+        dted = DTED(lat, lon, 0)  # Level 0
+        elevation_m = dted.get_elevation(lat, lon)
+        elevation_ft = elevation_m * 3.28084  # Convert meters to feet
+        return elevation_ft
+    except Exception as e:
+        print(f"Warning: Could not get DTED elevation data: {e}")
+        return None
+
+def get_manual_ground_elevation():
+    """
+    Prompts user for manual ground elevation input.
+    
+    Returns:
+        float: Ground elevation in feet MSL
+    """
+    while True:
+        try:
+            ground_elevation_ft = float(input("Enter ground elevation in feet MSL: "))
+            if -1000 <= ground_elevation_ft <= 30000:  # Reasonable range
+                return ground_elevation_ft
+            else:
+                print("Ground elevation must be between -1000 and 30000 feet.")
+        except ValueError:
+            print("Please enter a valid number.")
 
 def get_available_forecast_hours(model_type):
     """
@@ -269,6 +320,36 @@ def get_user_input():
         except ValueError:
             print("Please enter a valid number.")
 
+    # Ask for altitude reference preference
+    print("\nAltitude Reference:")
+    print("1. MSL (Mean Sea Level) - Height above sea level")
+    print("2. AGL (Above Ground Level) - Height above local terrain")
+    while True:
+        altitude_choice = input("Select altitude reference (1=MSL, 2=AGL): ").strip()
+        if altitude_choice == '1':
+            altitude_reference = 'MSL'
+            ground_elevation_ft = 0  # Not needed for MSL
+            print("Using MSL (Mean Sea Level) altitudes")
+            break
+        elif altitude_choice == '2':
+            altitude_reference = 'AGL'
+            print("Using AGL (Above Ground Level) altitudes")
+            # Try to get ground elevation automatically from DTED
+            if DTED_AVAILABLE:
+                ground_elevation_ft = get_ground_elevation(lat, lon)
+                if ground_elevation_ft is not None:
+                    print(f"Ground elevation from DTED: {ground_elevation_ft:.0f} feet MSL")
+                else:
+                    print("Could not get ground elevation from DTED. Manual input required.")
+                    ground_elevation_ft = get_manual_ground_elevation()
+            else:
+                print("DTED not available for automatic ground elevation lookup.")
+                print("Note: Install pydted from https://github.com/OpenTopography/pydted for automatic lookup.")
+                ground_elevation_ft = get_manual_ground_elevation()
+            break
+        else:
+            print("Please enter 1 for MSL or 2 for AGL.")
+
     # Determine which model to use based on location
     if is_within_conus(lat, lon):
         print(f"\nLocation is within CONUS. Choose model:")
@@ -368,7 +449,7 @@ def get_user_input():
                     speed = file_size / 1024 / 1024 / elapsed if elapsed > 0 else 0
                     print(f"Download complete. File size: {file_size/1024/1024:.2f} MB. Time: {elapsed:.1f}s. Speed: {speed:.2f} MB/s.")
                 # Return all info needed for main()
-                return lat, lon, max_elevation_ft, forecast_hour, model_type, filename, run_hour, date_str
+                return lat, lon, max_elevation_ft, forecast_hour, model_type, filename, run_hour, date_str, altitude_reference, ground_elevation_ft
             else:
                 print("Please enter 1, 2, 3, or 4.")
     else:
@@ -444,7 +525,7 @@ def get_user_input():
     print(f"Forecast hour: {forecast_hour} ({forecast_time})")
     print("=" * 40)
 
-    return lat, lon, max_elevation_ft, forecast_hour, model_type
+    return lat, lon, max_elevation_ft, forecast_hour, model_type, altitude_reference, ground_elevation_ft
 
 def get_forecast_time(forecast_hour, model_type):
     """
@@ -583,10 +664,10 @@ def main():
         # Get user input for location, elevation, and forecast hour
         user_input = get_user_input()
         # If auto mode, get all info directly
-        if len(user_input) == 8:
-            lat, lon, max_elevation_ft, forecast_hour, model_type, filename, run_hour, run_date_str = user_input
+        if len(user_input) == 10:
+            lat, lon, max_elevation_ft, forecast_hour, model_type, filename, run_hour, run_date_str, altitude_reference, ground_elevation_ft = user_input
         else:
-            lat, lon, max_elevation_ft, forecast_hour, model_type = user_input
+            lat, lon, max_elevation_ft, forecast_hour, model_type, altitude_reference, ground_elevation_ft = user_input
             filename, run_hour, run_date_str = download_forecast_file(forecast_hour, model_type)
             if filename is None:
                 print("No forecast file available. Exiting.")
@@ -692,7 +773,15 @@ def main():
 
     # Step 6: Interpolate wind data to regular altitude intervals
     # Create altitude array from 0 to user-specified maximum in 1,000-foot increments
-    interp_alt = np.arange(0, max_elevation_ft + 1000, 1000)
+    if altitude_reference == 'MSL':
+        # For MSL, use the altitudes as-is (they're already MSL from ISA model)
+        interp_alt = np.arange(0, max_elevation_ft + 1000, 1000)
+        altitude_label = "Altitude_ft_MSL"
+    else:  # AGL
+        # For AGL, we need to convert MSL altitudes to AGL by subtracting ground elevation
+        # Start from ground level (0 AGL) up to max_elevation_ft AGL
+        interp_alt = np.arange(0, max_elevation_ft + 1000, 1000)
+        altitude_label = "Altitude_ft_AGL"
 
     # Create interpolation functions for wind speed and direction
     # bounds_error=False allows extrapolation beyond data range
@@ -701,11 +790,22 @@ def main():
     dir_i = interp1d(alt_ft, dir, bounds_error=False, fill_value="extrapolate")
 
     # Apply interpolation to get wind values at each 1,000-foot level
+    if altitude_reference == 'MSL':
+        # For MSL, interpolate directly to the altitude levels
+        wind_speeds = speed_i(interp_alt)
+        wind_directions = dir_i(interp_alt)
+    else:  # AGL
+        # For AGL, we need to interpolate to MSL altitudes first, then convert to AGL
+        # Convert AGL altitudes to MSL for interpolation
+        msl_altitudes = interp_alt + ground_elevation_ft
+        wind_speeds = speed_i(msl_altitudes)
+        wind_directions = dir_i(msl_altitudes)
+
     df = pd.DataFrame(
         {
-            "Altitude_ft": interp_alt,
-            "Wind_Speed_kts": speed_i(interp_alt),  # Convert m/s to knots (1 m/s ≈ 1.944 kts)
-            "Wind_Direction_deg": dir_i(interp_alt),
+            altitude_label: interp_alt,
+            "Wind_Speed_kts": wind_speeds,
+            "Wind_Direction_deg": wind_directions,
         }
     )
 
@@ -713,6 +813,11 @@ def main():
     forecast_time = get_forecast_time(forecast_hour, model_type)
     print(f"\n{model_type.upper()} Wind Profile for {lat:.4f}°N, {lon:.4f}°E")
     print(f"Forecast: {forecast_time}")
+    if altitude_reference == 'AGL':
+        print(f"Altitude Reference: AGL (Above Ground Level)")
+        print(f"Ground Elevation: {ground_elevation_ft:.0f} feet MSL")
+    else:
+        print(f"Altitude Reference: MSL (Mean Sea Level)")
     print("=" * 60)
     print(df.to_string(index=False))
 
@@ -734,11 +839,19 @@ def main():
             f.write(f"{model_type.upper()} Wind Profile for {lat:.4f}°N, {lon:.4f}°E\n")
             f.write(f"Forecast: {forecast_time}\n")
             f.write(f"Valid Zulu Time: {valid_time_str}\n")
+            if altitude_reference == 'AGL':
+                f.write(f"Altitude Reference: AGL (Above Ground Level)\n")
+                f.write(f"Ground Elevation: {ground_elevation_ft:.0f} feet MSL\n")
+            else:
+                f.write(f"Altitude Reference: MSL (Mean Sea Level)\n")
             f.write("=" * 60 + "\n")
             f.write(df.to_string(index=False) + "\n")
         print(f"Human-readable results saved to: {txt_filename}")
-        # Add valid Zulu time as a column in CSV
+        # Add valid Zulu time and altitude reference as columns in CSV
         df['Valid_Zulu_Time'] = valid_time_str
+        df['Altitude_Reference'] = altitude_reference
+        if altitude_reference == 'AGL':
+            df['Ground_Elevation_MSL_ft'] = ground_elevation_ft
         df.to_csv(csv_filename, index=False)
         print(f"CSV results saved to: {csv_filename}")
 
