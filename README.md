@@ -2,6 +2,38 @@
 
 A Python tool that downloads, extracts, and interpolates wind data from NOAA's HRRR, RAP, and GFS weather models to provide wind speed and direction profiles at various altitudes for a specified location.
 
+---
+
+## 🔒 Why Source Directly from NOAA?
+
+For operations requiring atmospheric wind data, it may be advantageous to source forecasts directly from official U.S. government models such as HRRR, RAP, or GFS provided by NOAA, rather than relying on third-party public websites. While both methods involve retrieving data over the internet, using government-hosted sources may offer greater reliability and reduce exposure to unvetted external platforms. Additionally, once the data is downloaded, it can be processed locally without further internet access, enabling offline use in communications-restricted environments. This approach may enhance operational resilience and data integrity in tactical or field applications.
+
+### 🔐 Enhanced Security Through Global Data Processing
+
+**Local Location Processing:**
+Unlike web-based wind profilers that send your specific coordinates to external servers, this tool downloads **complete global weather data** and processes your location information entirely on your local device. This approach provides several security advantages:
+
+- **No Location Tracking**: Your exact coordinates are never transmitted to external servers
+- **No Query Logs**: External services cannot log your location requests or usage patterns
+- **Offline Capability**: Once downloaded, wind profiles can be generated without internet access
+- **Operational Security**: Ideal for tactical operations where location privacy is critical
+
+**How It Works:**
+1. **Global Download**: Downloads complete weather data for the entire Earth (GFS) or continental region (HRRR/RAP)
+2. **Local Processing**: Your device extracts and interpolates wind data for your specific location
+3. **No External Queries**: No need to send coordinates to third-party services
+4. **Cached Data**: Downloaded files can be reused for multiple locations without additional downloads
+
+**Security Benefits:**
+- **Location Privacy**: Your coordinates never leave your device
+- **Usage Anonymity**: No external service can track your wind profiling activities
+- **Reduced Digital Footprint**: Minimizes exposure to potential surveillance or tracking
+- **Tactical Advantage**: Enables wind analysis in communications-restricted environments
+
+This approach is particularly valuable for aviation, military operations, research, and any application where location privacy and operational security are priorities.
+
+---
+
 ## Features
 
 - **Multiple Weather Models**: Support for HRRR (High-Resolution Rapid Refresh), RAP (Rapid Refresh), and GFS (Global Forecast System)
@@ -27,6 +59,7 @@ A Python tool that downloads, extracts, and interpolates wind data from NOAA's H
 - **No Location Tracking**: Your coordinates are never sent to external services
 - **Offline Capable**: Once downloaded, forecast files can be used offline
 - **Privacy Preserved**: No personal data or location information is transmitted
+- **Operational Security**: Ideal for tactical, aviation, or field use where privacy is critical.
 
 ## Installation
 
@@ -214,6 +247,14 @@ The repository includes example output files from various locations and models:
 - `wind_profile_35.69_139.69_gfs_3h.txt` — Wind profile for Tokyo, Japan (3-hour GFS forecast)
 
 These files show the format and content you can expect when saving results as text files.
+
+## Data Sources
+
+- **NOAA NOMADS:** [https://nomads.ncep.noaa.gov/](https://nomads.ncep.noaa.gov/)
+- **HRRR Model:** High-Resolution Rapid Refresh documentation
+- **RAP Model:** Rapid Refresh documentation
+- **GFS Model:** Global Forecast System documentation
+- **GRIB2 Format:** WMO standard for meteorological data
 
 ## Requirements
 
