@@ -1,4 +1,4 @@
-# GFS Wind Profiler
+# Wind Profiler
 
 ---
 
