@@ -151,10 +151,10 @@ GFS Wind Profiler - Location Setup
 ========================================
 Enter latitude (decimal degrees, -90 to 90): 32.22
 Enter longitude (decimal degrees, -180 to 180): -110.94
-Enter maximum elevation in feet (1000 to 50000): 20000
+Enter maximum elevation in feet (1000 to 50000): 15000
 
 Location: 32.2200°N, -110.9400°E
-Maximum elevation: 20,000 feet
+Maximum elevation: 15,000 feet
 ========================================
 Using cached file: gfs.t00z.pgrb2.0p25.f000
 Processing wind data...
@@ -166,7 +166,7 @@ GFS Wind Profile for 32.2200°N, -110.9400°E
         1000        0.106185          288.963790
         2000        0.107529          286.372465
         ...
-       20000       13.234940          265.378142
+       15000       13.234940          265.378142
 ```
 
 ### Forecast Hours Selection
@@ -401,7 +401,7 @@ For questions or issues:
 - **Pressure-to-Altitude Conversion:** The script uses the International Standard Atmosphere (ISA) model to convert each pressure level to its corresponding altitude in feet.
 - **Wind Components:** For each pressure level, the script extracts the U (east-west) and V (north-south) wind components, then calculates wind speed and direction.
 - **Interpolation:**
-  - The script creates a regular grid of altitudes from 0 to your specified maximum (e.g., 0 to 20,000 feet) in 1,000-foot increments.
+  - The script creates a regular grid of altitudes from 0 to your specified maximum elevation in 1,000-foot increments.
   - It uses linear interpolation (via `scipy.interpolate.interp1d`) to estimate wind speed and direction at each 1,000-foot level, based on the values at the original pressure levels.
 - **Result:**
   - You get a smooth, regularly spaced wind profile (every 1,000 feet) that is easy to read and use for aviation, ballooning, UAVs, and more.
