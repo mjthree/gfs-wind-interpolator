@@ -1,0 +1,42 @@
+# Downloaded GFS/HRRR data files
+gfs.*.grib2*
+hrrr.*.grib2*
+*.idx
+
+# Python cache and virtual environments
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+wind_env/
+
+# System files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+
+# Output files (optional - uncomment if you don't want to track exported data)
+# *_winds.txt
+# wind_*.txt 
