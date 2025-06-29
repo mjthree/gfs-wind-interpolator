@@ -128,7 +128,7 @@ python -c "import cfgrib, xarray, pandas, numpy, scipy; print('All packages impo
 4. **Install system dependencies** (see above for your OS)
 5. **Run the script:**
    ```bash
-   python winds_from_grib2.py
+   python wind_profiler.py
    ```
 
 ---
@@ -138,7 +138,7 @@ python -c "import cfgrib, xarray, pandas, numpy, scipy; print('All packages impo
 ### Basic Usage
 
 ```bash
-python winds_from_grib2.py
+python wind_profiler.py
 ```
 
 The script will prompt you for:
@@ -290,7 +290,7 @@ Default filename format: `{location}_{model}_{forecast_hour}h.txt`
 For automated or batch processing, you can modify the script to accept command line arguments:
 
 ```python
-# Example: Add to the top of winds_from_grib2.py
+# Example: Add to the top of wind_profiler.py
 import sys
 
 if len(sys.argv) >= 4:
