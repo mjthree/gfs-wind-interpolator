@@ -127,25 +127,93 @@ The tool includes comprehensive error handling for:
 - **File Corruption**: Invalid or incomplete downloads
 - **Invalid Input**: Out-of-range coordinates or parameters
 
-## Examples
+## Advanced Usage
 
-### New York City (40.7128°N, -74.0060°E)
-```bash
-python wind_profiler.py
-# Enter: 40.7128, -74.0060, 10000, 2, 1, 0
+### Command Line Options
+
+For automated or batch processing, you can modify the script to accept command line arguments:
+
+```python
+# Example: Add to the top of wind_profiler.py
+import sys
+
+if len(sys.argv) >= 4:
+    lat = float(sys.argv[1])
+    lon = float(sys.argv[2])
+    max_elevation = int(sys.argv[3])
+    forecast_hour = int(sys.argv[4]) if len(sys.argv) > 4 else 0
+    # Use these values instead of prompting
 ```
 
-### Los Angeles (34.0522°N, -118.2437°E)
-```bash
-python wind_profiler.py
-# Enter: 34.0522, -118.2437, 15000, 2, 1, 0
+### Batch Processing
+
+Create a script to process multiple locations:
+
+```python
+locations = [
+    (32.22, -110.94, 20000),  # Tucson
+    (52.52, 13.41, 15000),    # Berlin
+    (21.31, -157.86, 25000),  # Honolulu
+]
+
+for lat, lon, max_elev in locations:
+    # Process each location
+    print(f"Processing {lat}, {lon}")
+    # ... wind calculation code
 ```
 
-### International Location (London: 51.5074°N, -0.1278°E)
-```bash
-python wind_profiler.py
-# Enter: 51.5074, -0.1278, 20000, 2, 3, 0
-```
+### Data Analysis
+
+The interpolated data can be used for:
+- **Wind Shear Analysis**: Calculate wind shear between altitude levels
+- **Trend Analysis**: Compare multiple forecast hours
+- **Statistical Analysis**: Process multiple locations or time periods
+- **Visualization**: Create wind profile plots using matplotlib
+
+## Troubleshooting
+
+### Common Issues
+
+- **"No GFS forecast files are currently available" error:**
+  - GFS data may be temporarily unavailable
+  - Try using Auto mode to select an available model
+  - Try a different forecast hour
+  - Wait a few hours and try again
+
+- **"Failed to download" error:**
+  - Check internet connection
+  - NOAA servers may be temporarily unavailable
+  - Try running again in a few minutes
+
+- **"Error loading data" error:**
+  - Ensure eccodes is properly installed
+  - Try deleting cached .grib2 files and re-downloading
+  - Check Python environment has all required packages
+
+- **Import errors:**
+  - Verify all dependencies are installed: `pip list | grep -E "(cfgrib|xarray|pandas|numpy|scipy)"`
+  - Consider using a virtual environment
+
+- **Environment issues:**
+  - Ensure you're in the correct virtual environment: `which python`
+  - Reinstall dependencies if needed: `pip install --upgrade -r requirements.txt`
+
+### Performance Tips
+
+- **Caching**: Downloaded files are cached locally for faster subsequent runs
+- **Location**: Script works best for locations over land (ocean data may be limited)
+- **Timing**: Model data is typically available 1-4 hours after each run time
+- **Auto Mode**: Use Auto mode for best model selection and availability
+
+## Example Output
+
+The repository includes example output files from various locations and models:
+
+- `wind_profile_40.71_-74.01_hrrr_0h.txt` — Wind profile for New York, NY (1-hour HRRR forecast)
+- `wind_profile_52.52_13.40_gfs_3h.txt` — Wind profile for Berlin, Germany (3-hour GFS forecast)
+- `wind_profile_35.69_139.69_gfs_3h.txt` — Wind profile for Tokyo, Japan (3-hour GFS forecast)
+
+These files show the format and content you can expect when saving results as text files.
 
 ## Requirements
 
