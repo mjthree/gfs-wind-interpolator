@@ -109,10 +109,10 @@ After setting up your environment, verify the installation:
 python --version
 
 # Check installed packages
-pip list | grep -E "(cfgrib|xarray|pandas|numpy|scipy|requests)"
+pip list | grep -E "(cfgrib|xarray|pandas|numpy|scipy)"
 
 # Test import
-python -c "import cfgrib, xarray, pandas, numpy, scipy, requests; print('All packages imported successfully!')"
+python -c "import cfgrib, xarray, pandas, numpy, scipy; print('All packages imported successfully!')"
 ```
 
 ---
@@ -364,7 +364,7 @@ python raw_data_viewer.py
 - Check Python environment has all required packages
 
 **Import errors:**
-- Verify all dependencies are installed: `pip list | grep -E "(cfgrib|xarray|pandas|numpy|scipy|requests)"`
+ - Verify all dependencies are installed: `pip list | grep -E "(cfgrib|xarray|pandas|numpy|scipy)"`
 - Consider using a virtual environment
 
 **Environment issues:**

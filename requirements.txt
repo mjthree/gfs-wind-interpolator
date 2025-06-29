@@ -3,4 +3,3 @@ xarray
 pandas
 numpy
 scipy
-requests
