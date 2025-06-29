@@ -17,10 +17,30 @@ A Python tool to automatically download, extract, and interpolate high-resolutio
 
 ---
 
+## 🔒 Why Source Directly from NOAA?
+
+For operations requiring atmospheric wind data, it may be advantageous to source forecasts directly from official U.S. government models such as HRRR or GFS provided by NOAA, rather than relying on third-party public websites like the Mark Schulze wind profiler. While both methods involve retrieving data over the internet, using government-hosted sources may offer greater reliability and reduce exposure to unvetted external platforms. Additionally, once the data is downloaded, it can be processed locally without further internet access, enabling offline use in communications-restricted environments. This approach may enhance operational resilience and data integrity in tactical or field applications.
+
+---
+
 ## 📦 Requirements
 
 - **Python 3.8+** (tested on Python 3.8-3.13)
 - **Recommended**: macOS or Linux (Windows WSL also works)
+
+### System Requirements
+
+- **Memory**: Minimum 2GB RAM (4GB+ recommended for large files)
+- **Storage**: ~50MB per forecast file (cached locally)
+- **Network**: Internet connection for initial data download
+- **Processing**: Single-core processing is sufficient
+
+### Performance Considerations
+
+- **First Run**: May take 1-2 minutes to download initial data
+- **Subsequent Runs**: Typically 10-30 seconds with cached files
+- **File Size**: GFS files ~50MB, HRRR files ~200MB
+- **Cache Management**: Old files are automatically detected and can be refreshed
 
 ### Python Dependencies
 
@@ -151,6 +171,47 @@ GFS Wind Profile for 32.2200°N, -110.9400°E
        20000       13.234940          265.378142
 ```
 
+### Forecast Hours Selection
+
+The script allows you to select forecast hours for more detailed analysis:
+
+- **GFS Model**: 0 to 384 hours (16 days)
+- **HRRR Model**: 0 to 18 hours
+
+```
+Select forecast hour (0-384 for GFS, 0-18 for HRRR): 6
+```
+
+- **0-hour**: Current analysis (most accurate for current conditions)
+- **6-hour**: 6-hour forecast
+- **12-hour**: 12-hour forecast
+- And so on...
+
+### File Caching
+
+The script automatically caches downloaded files and asks whether to use cached or fresh data:
+
+```
+Found cached file: gfs.t18z.pgrb2.0p25.f006 (2.3 MB, 3 hours old)
+Use cached file? (y/n): y
+```
+
+- **Cached files**: Faster execution, no re-download needed
+- **Fresh files**: Ensures latest data, but requires download time
+- **File age**: Shows when the cached file was downloaded
+- **File size**: Helps verify data integrity
+
+### Data Export
+
+Results can be saved to a file for further analysis:
+
+```
+Save results to file? (y/n): y
+Enter filename (or press Enter for default): berlin_winds.txt
+```
+
+Default filename format: `{location}_{model}_{forecast_hour}h.txt`
+
 ### Output Format
 
 - **Altitude_ft**: Height above ground level in feet
@@ -172,6 +233,32 @@ GFS Wind Profile for 32.2200°N, -110.9400°E
 
 ---
 
+## 📊 Data Accuracy & Limitations
+
+### Interpolation Quality
+
+- **Linear Interpolation**: Uses linear interpolation between pressure levels, which is standard practice in meteorology
+- **Altitude Conversion**: Based on International Standard Atmosphere (ISA) model, which assumes standard atmospheric conditions
+- **Grid Resolution**: GFS data at 0.25° resolution (~25km), HRRR at 3km resolution
+- **Update Frequency**: GFS every 6 hours, HRRR every hour
+
+### Known Limitations
+
+- **Atmospheric Variations**: ISA model may not perfectly match actual atmospheric conditions
+- **Terrain Effects**: Model doesn't account for local terrain influences on wind patterns
+- **Temporal Resolution**: Limited to model output times (not real-time)
+- **Ocean vs Land**: Data quality may vary over oceans vs. land areas
+- **Extreme Weather**: Accuracy may decrease during severe weather events
+
+### Best Practices
+
+- **Current Conditions**: Use 0-hour forecast for most accurate current conditions
+- **Short-term Planning**: Use 6-12 hour forecasts for near-term planning
+- **Verification**: Compare with local observations when available
+- **Multiple Sources**: Consider using multiple forecast hours for trend analysis
+
+---
+
 ## 🌍 Data Coverage
 
 - **Global Coverage**: Works for any location worldwide
@@ -179,6 +266,66 @@ GFS Wind Profile for 32.2200°N, -110.9400°E
 - **Resolution**: 0.25-degree grid (approximately 25km)
 - **Altitude Range**: 0 to 50,000 feet (limited by GFS pressure levels)
 - **Forecast Period**: 0-hour analysis (current conditions)
+
+---
+
+## 🌎 Model Selection & Coverage
+
+- **HRRR (High-Resolution Rapid Refresh):**
+  - Coverage: Only the continental US (CONUS, 20°N–60°N, 140°W–50°W)
+  - Does NOT cover Hawaii, Alaska, or US territories
+  - Used automatically for locations within CONUS
+- **GFS (Global Forecast System):**
+  - Coverage: Global (including Hawaii, Alaska, and all other locations)
+  - Used automatically for all locations outside CONUS
+
+**The script will automatically select the best model based on your coordinates.**
+
+---
+
+## ⚙️ Advanced Usage
+
+### Command Line Options
+
+For automated or batch processing, you can modify the script to accept command line arguments:
+
+```python
+# Example: Add to the top of winds_from_grib2.py
+import sys
+
+if len(sys.argv) >= 4:
+    lat = float(sys.argv[1])
+    lon = float(sys.argv[2])
+    max_elevation = int(sys.argv[3])
+    forecast_hour = int(sys.argv[4]) if len(sys.argv) > 4 else 0
+    # Use these values instead of prompting
+```
+
+### Batch Processing
+
+Create a script to process multiple locations:
+
+```python
+locations = [
+    (32.22, -110.94, 20000),  # Tucson
+    (52.52, 13.41, 15000),    # Berlin
+    (21.31, -157.86, 25000),  # Honolulu
+]
+
+for lat, lon, max_elev in locations:
+    # Process each location
+    print(f"Processing {lat}, {lon}")
+    # ... wind calculation code
+```
+
+### Data Analysis
+
+The interpolated data can be used for:
+
+- **Wind Shear Analysis**: Calculate wind shear between altitude levels
+- **Trend Analysis**: Compare multiple forecast hours
+- **Statistical Analysis**: Process multiple locations or time periods
+- **Visualization**: Create wind profile plots using matplotlib
 
 ---
 
@@ -249,3 +396,14 @@ For questions or issues:
 1. Check the troubleshooting section above
 2. Review the code comments for technical details
 3. Open an issue on the repository
+
+## 🪁 How Are Winds Calculated Every 1,000 Feet?
+
+- **Raw Data:** Both HRRR and GFS provide wind data at specific pressure levels (e.g., 1000 hPa, 925 hPa, 850 hPa, etc.), not at fixed altitude intervals.
+- **Pressure-to-Altitude Conversion:** The script uses the International Standard Atmosphere (ISA) model to convert each pressure level to its corresponding altitude in feet.
+- **Wind Components:** For each pressure level, the script extracts the U (east-west) and V (north-south) wind components, then calculates wind speed and direction.
+- **Interpolation:**
+  - The script creates a regular grid of altitudes from 0 to your specified maximum (e.g., 0 to 20,000 feet) in 1,000-foot increments.
+  - It uses linear interpolation (via `scipy.interpolate.interp1d`) to estimate wind speed and direction at each 1,000-foot level, based on the values at the original pressure levels.
+- **Result:**
+  - You get a smooth, regularly spaced wind profile (every 1,000 feet) that is easy to read and use for aviation, ballooning, UAVs, and more.
