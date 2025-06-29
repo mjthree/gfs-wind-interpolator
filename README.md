@@ -1,6 +1,10 @@
 # GFS Wind Profiler
 
-A Python tool to automatically download, extract, and interpolate high-resolution wind data from the NOAA GFS model. Outputs wind speed and direction every 1,000 feet above a user-specified location. Runs entirely on-device using open-source libraries and official .grib2 forecast data.
+---
+
+## 🔒 Why Source Directly from NOAA?
+
+For operations requiring atmospheric wind data, it may be advantageous to source forecasts directly from official U.S. government models such as HRRR or GFS provided by NOAA, rather than relying on third-party public websites like the Mark Schulze wind profiler. While both methods involve retrieving data over the internet, using government-hosted sources may offer greater reliability and reduce exposure to unvetted external platforms. Additionally, once the data is downloaded, it can be processed locally without further internet access, enabling offline use in communications-restricted environments. This approach may enhance operational resilience and data integrity in tactical or field applications.
 
 ---
 
@@ -14,12 +18,6 @@ A Python tool to automatically download, extract, and interpolate high-resolutio
 - **Offline Capable**: Caches downloaded data for repeated use
 - **No API Keys Required**: Uses publicly available NOAA data
 - **Cross-Platform**: Works on macOS, Linux, and Windows (WSL)
-
----
-
-## 🔒 Why Source Directly from NOAA?
-
-For operations requiring atmospheric wind data, it may be advantageous to source forecasts directly from official U.S. government models such as HRRR or GFS provided by NOAA, rather than relying on third-party public websites like the Mark Schulze wind profiler. While both methods involve retrieving data over the internet, using government-hosted sources may offer greater reliability and reduce exposure to unvetted external platforms. Additionally, once the data is downloaded, it can be processed locally without further internet access, enabling offline use in communications-restricted environments. This approach may enhance operational resilience and data integrity in tactical or field applications.
 
 ---
 
