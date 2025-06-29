@@ -535,6 +535,27 @@ def main():
     print("=" * 60)
     print(df.to_string(index=False))
 
+    # Ask if user wants to save results
+    while True:
+        save_choice = input("\nSave results to file? (y/n): ").lower().strip()
+        if save_choice in ['y', 'n']:
+            break
+        else:
+            print("Please enter 'y' or 'n'.")
+    if save_choice == 'y':
+        default_base = f"wind_profile_{lat:.2f}_{lon:.2f}_{model_type}_{forecast_hour}h"
+        # Always use default filenames
+        csv_filename = f"{default_base}.csv"
+        df.to_csv(csv_filename, index=False)
+        print(f"Results saved to: {csv_filename}")
+        txt_filename = f"{default_base}.txt"
+        with open(txt_filename, 'w') as f:
+            f.write(f"{model_type.upper()} Wind Profile for {lat:.4f}°N, {lon:.4f}°E\n")
+            f.write(f"Forecast: {forecast_time}\n")
+            f.write("=" * 60 + "\n")
+            f.write(df.to_string(index=False) + "\n")
+        print(f"Human-readable results saved to: {txt_filename}")
+
     # NOTE: This script operates fully offline after the forecast file is downloaded.
     #       No external polling (e.g., from open websites) is required at runtime.
     #       This may offer improved operational security in field or tactical settings.
