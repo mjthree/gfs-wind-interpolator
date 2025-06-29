@@ -415,6 +415,10 @@ For questions or issues:
 2. Review the code comments for technical details
 3. Open an issue on the repository
 
+## ⚠️ Disclaimer
+
+This software is provided "as is," without warranty of any kind, express or implied. Use of this tool and the data it produces is at your own risk. The authors and contributors are not responsible for any loss, damage, or consequences resulting from the use of this software or its outputs, including but not limited to operational, financial, or safety impacts. This tool is not certified for use in life-critical or aviation navigation applications. Always verify results with official sources and exercise appropriate judgment.
+
 ## 🪁 How Are Winds Calculated Every 1,000 Feet?
 
 - **Raw Data:** Both HRRR and GFS provide wind data at specific pressure levels (e.g., 1000 hPa, 925 hPa, 850 hPa, etc.), not at fixed altitude intervals.
