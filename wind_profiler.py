@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """
 NOAA Wind Profiler - HRRR/GFS Wind Data Extractor
 
@@ -413,131 +414,132 @@ def load_forecast_data(filename, model_type):
         sys.stderr.close()
         sys.stderr = original_stderr
 
-# Get user input for location, elevation, and forecast hour
-lat, lon, max_elevation_ft, forecast_hour, model_type = get_user_input()
+def main():
+    """Entry point for command-line execution."""
+    # Get user input for location, elevation, and forecast hour
+    lat, lon, max_elevation_ft, forecast_hour, model_type = get_user_input()
 
-# Step 1: Download the specified forecast file
-filename = download_forecast_file(forecast_hour, model_type)
+    # Step 1: Download the specified forecast file
+    filename = download_forecast_file(forecast_hour, model_type)
 
-# Step 2: Load and parse the GRIB2 file using cfgrib
-print("Processing wind data...")
-ds = load_forecast_data(filename, model_type)
+    # Step 2: Load and parse the GRIB2 file using cfgrib
+    print("Processing wind data...")
+    ds = load_forecast_data(filename, model_type)
 
-# Step 3: Find the nearest grid point to our target location
-# Forecast data may use irregular grids, so we need to handle 2D coordinate arrays
-print(f"Grid dimensions: lat={len(ds.latitude)}, lon={len(ds.longitude)}")
-print(f"Latitude array shape: {ds.latitude.values.shape}")
-print(f"Longitude array shape: {ds.longitude.values.shape}")
+    # Step 3: Find the nearest grid point to our target location
+    # Forecast data may use irregular grids, so we need to handle 2D coordinate arrays
+    print(f"Grid dimensions: lat={len(ds.latitude)}, lon={len(ds.longitude)}")
+    print(f"Latitude array shape: {ds.latitude.values.shape}")
+    print(f"Longitude array shape: {ds.longitude.values.shape}")
 
-# Handle longitude conversion properly
-lon_adjusted = lon
-if model_type == 'hrrr':
-    # HRRR uses longitude from 0 to 360, convert from -180 to 180 format
-    if lon < 0:
-        lon_adjusted = lon + 360
-    print(f"Converting longitude from {lon} to {lon_adjusted} for HRRR format")
+    # Handle longitude conversion properly
+    lon_adjusted = lon
+    if model_type == 'hrrr':
+        # HRRR uses longitude from 0 to 360, convert from -180 to 180 format
+        if lon < 0:
+            lon_adjusted = lon + 360
+        print(f"Converting longitude from {lon} to {lon_adjusted} for HRRR format")
 
-# Check if we have 2D coordinate arrays (irregular grid)
-if len(ds.latitude.values.shape) == 2 and len(ds.longitude.values.shape) == 2:
-    print("Detected 2D coordinate arrays (irregular grid)")
-    # For 2D arrays, find the nearest point across the entire grid
-    lat_diff = np.abs(ds.latitude.values - lat)
-    lon_diff = np.abs(ds.longitude.values - lon_adjusted)
-    total_diff = lat_diff + lon_diff  # Simple distance metric
-    lat_idx, lon_idx = np.unravel_index(total_diff.argmin(), total_diff.shape)
-else:
-    # For 1D arrays (regular grid)
-    print("Detected 1D coordinate arrays (regular grid)")
-    lat_idx = np.abs(ds.latitude.values - lat).argmin()
-    lon_idx = np.abs(ds.longitude.values - lon_adjusted).argmin()
+    # Check if we have 2D coordinate arrays (irregular grid)
+    if len(ds.latitude.values.shape) == 2 and len(ds.longitude.values.shape) == 2:
+        print("Detected 2D coordinate arrays (irregular grid)")
+        # For 2D arrays, find the nearest point across the entire grid
+        lat_diff = np.abs(ds.latitude.values - lat)
+        lon_diff = np.abs(ds.longitude.values - lon_adjusted)
+        total_diff = lat_diff + lon_diff  # Simple distance metric
+        lat_idx, lon_idx = np.unravel_index(total_diff.argmin(), total_diff.shape)
+    else:
+        # For 1D arrays (regular grid)
+        print("Detected 1D coordinate arrays (regular grid)")
+        lat_idx = np.abs(ds.latitude.values - lat).argmin()
+        lon_idx = np.abs(ds.longitude.values - lon_adjusted).argmin()
 
-# Validate indices are within bounds
-if len(ds.latitude.values.shape) == 2:
-    # 2D arrays (irregular grid like HRRR)
-    if lat_idx >= ds.latitude.values.shape[0] or lon_idx >= ds.longitude.values.shape[1]:
-        print(f"Error: Calculated grid indices ({lat_idx}, {lon_idx}) are out of bounds.")
-        print(f"Grid size: lat={ds.latitude.values.shape[0]}, lon={ds.longitude.values.shape[1]}")
-        print(f"Target location: lat={lat}, lon={lon}")
-        print(f"Adjusted longitude: {lon_adjusted}")
-        exit(1)
-else:
-    # 1D arrays (regular grid like GFS)
-    if lat_idx >= ds.latitude.values.shape[0] or lon_idx >= ds.longitude.values.shape[0]:
-        print(f"Error: Calculated grid indices ({lat_idx}, {lon_idx}) are out of bounds.")
-        print(f"Grid size: lat={ds.latitude.values.shape[0]}, lon={ds.longitude.values.shape[0]}")
-        print(f"Target location: lat={lat}, lon={lon}")
-        print(f"Adjusted longitude: {lon_adjusted}")
-        exit(1)
+    # Validate indices are within bounds
+    if len(ds.latitude.values.shape) == 2:
+        # 2D arrays (irregular grid like HRRR)
+        if lat_idx >= ds.latitude.values.shape[0] or lon_idx >= ds.longitude.values.shape[1]:
+            print(f"Error: Calculated grid indices ({lat_idx}, {lon_idx}) are out of bounds.")
+            print(f"Grid size: lat={ds.latitude.values.shape[0]}, lon={ds.longitude.values.shape[1]}")
+            print(f"Target location: lat={lat}, lon={lon}")
+            print(f"Adjusted longitude: {lon_adjusted}")
+            exit(1)
+    else:
+        # 1D arrays (regular grid like GFS)
+        if lat_idx >= ds.latitude.values.shape[0] or lon_idx >= ds.longitude.values.shape[0]:
+            print(f"Error: Calculated grid indices ({lat_idx}, {lon_idx}) are out of bounds.")
+            print(f"Grid size: lat={ds.latitude.values.shape[0]}, lon={ds.longitude.values.shape[0]}")
+            print(f"Target location: lat={lat}, lon={lon}")
+            print(f"Adjusted longitude: {lon_adjusted}")
+            exit(1)
 
-# Get the actual grid coordinates for verification
-if len(ds.latitude.values.shape) == 2:
-    # 2D arrays (irregular grid)
-    actual_lat = float(ds.latitude.values[lat_idx, lon_idx])
-    actual_lon = float(ds.longitude.values[lat_idx, lon_idx])
-else:
-    # 1D arrays (regular grid)
-    actual_lat = float(ds.latitude.values[lat_idx])
-    actual_lon = float(ds.longitude.values[lon_idx])
+    # Get the actual grid coordinates for verification
+    if len(ds.latitude.values.shape) == 2:
+        # 2D arrays (irregular grid)
+        actual_lat = float(ds.latitude.values[lat_idx, lon_idx])
+        actual_lon = float(ds.longitude.values[lat_idx, lon_idx])
+    else:
+        # 1D arrays (regular grid)
+        actual_lat = float(ds.latitude.values[lat_idx])
+        actual_lon = float(ds.longitude.values[lon_idx])
 
-print(f"Target location: {lat:.4f}°N, {lon:.4f}°E")
-print(f"Nearest grid point: {actual_lat:.4f}°N, {actual_lon:.4f}°E")
-print(f"Grid indices: lat_idx={lat_idx}, lon_idx={lon_idx}")
+    print(f"Target location: {lat:.4f}°N, {lon:.4f}°E")
+    print(f"Nearest grid point: {actual_lat:.4f}°N, {actual_lon:.4f}°E")
+    print(f"Grid indices: lat_idx={lat_idx}, lon_idx={lon_idx}")
 
-# Extract wind components at all pressure levels for our location
-levs = ds.isobaricInhPa.values  # Pressure levels in hPa
-u = ds.u.values[:, lat_idx, lon_idx]  # U-component (eastward wind) in m/s
-v = ds.v.values[:, lat_idx, lon_idx]  # V-component (northward wind) in m/s
+    # Extract wind components at all pressure levels for our location
+    levs = ds.isobaricInhPa.values  # Pressure levels in hPa
+    u = ds.u.values[:, lat_idx, lon_idx]  # U-component (eastward wind) in m/s
+    v = ds.v.values[:, lat_idx, lon_idx]  # V-component (northward wind) in m/s
 
-# Step 4: Calculate wind speed and direction from U and V components
-# Wind speed = sqrt(u² + v²)
-spd = np.sqrt(u**2 + v**2)
-# Wind direction = 270° - arctan2(v,u), then normalize to 0-360°
-# Meteorological convention: 0° = North, 90° = East, 180° = South, 270° = West
-dir = (270 - np.rad2deg(np.arctan2(v, u))) % 360
+    # Step 4: Calculate wind speed and direction from U and V components
+    # Wind speed = sqrt(u² + v²)
+    spd = np.sqrt(u**2 + v**2)
+    # Wind direction = 270° - arctan2(v,u), then normalize to 0-360°
+    # Meteorological convention: 0° = North, 90° = East, 180° = South, 270° = West
+    dir = (270 - np.rad2deg(np.arctan2(v, u))) % 360
 
-# Step 5: Convert pressure levels to altitude using International Standard Atmosphere (ISA)
-def pressure_to_alt(p_hpa):
-    """
-    Converts pressure in hectopascals to altitude in feet using ISA model.
-    
-    Args:
-        p_hpa (float or array): Pressure in hectopascals (hPa)
-    
-    Returns:
-        float or array: Altitude in feet
-    """
-    # ISA formula: h = 44330 * (1 - (p/1013.25)^(1/5.255)) * 3.28084
-    # Where 1013.25 hPa is standard sea-level pressure
-    return 44330 * (1 - (p_hpa / 1013.25) ** (1 / 5.255)) * 3.28084
+    # Step 5: Convert pressure levels to altitude using International Standard Atmosphere (ISA)
+    def pressure_to_alt(p_hpa):
+        """Converts pressure in hectopascals to altitude in feet using ISA model."""
 
-# Convert each pressure level to corresponding altitude
-alt_ft = pressure_to_alt(levs)
+        # ISA formula: h = 44330 * (1 - (p/1013.25)^(1/5.255)) * 3.28084
+        # Where 1013.25 hPa is standard sea-level pressure
+        return 44330 * (1 - (p_hpa / 1013.25) ** (1 / 5.255)) * 3.28084
 
-# Step 6: Interpolate wind data to regular altitude intervals
-# Create altitude array from 0 to user-specified maximum in 1,000-foot increments
-interp_alt = np.arange(0, max_elevation_ft + 1000, 1000)
+    # Convert each pressure level to corresponding altitude
+    alt_ft = pressure_to_alt(levs)
 
-# Create interpolation functions for wind speed and direction
-# bounds_error=False allows extrapolation beyond data range
-# fill_value="extrapolate" uses linear extrapolation for out-of-bounds values
-speed_i = interp1d(alt_ft, spd, bounds_error=False, fill_value="extrapolate")
-dir_i = interp1d(alt_ft, dir, bounds_error=False, fill_value="extrapolate")
+    # Step 6: Interpolate wind data to regular altitude intervals
+    # Create altitude array from 0 to user-specified maximum in 1,000-foot increments
+    interp_alt = np.arange(0, max_elevation_ft + 1000, 1000)
 
-# Apply interpolation to get wind values at each 1,000-foot level
-df = pd.DataFrame({
-    "Altitude_ft": interp_alt,
-    "Wind_Speed_kts": speed_i(interp_alt),  # Convert m/s to knots (1 m/s ≈ 1.944 kts)
-    "Wind_Direction_deg": dir_i(interp_alt)
-})
+    # Create interpolation functions for wind speed and direction
+    # bounds_error=False allows extrapolation beyond data range
+    # fill_value="extrapolate" uses linear extrapolation for out-of-bounds values
+    speed_i = interp1d(alt_ft, spd, bounds_error=False, fill_value="extrapolate")
+    dir_i = interp1d(alt_ft, dir, bounds_error=False, fill_value="extrapolate")
 
-# Step 7: Display results in a formatted table
-forecast_time = get_forecast_time(forecast_hour, model_type)
-print(f"\n{model_type.upper()} Wind Profile for {lat:.4f}°N, {lon:.4f}°E")
-print(f"Forecast: {forecast_time}")
-print("=" * 60)
-print(df.to_string(index=False))
+    # Apply interpolation to get wind values at each 1,000-foot level
+    df = pd.DataFrame(
+        {
+            "Altitude_ft": interp_alt,
+            "Wind_Speed_kts": speed_i(interp_alt),  # Convert m/s to knots (1 m/s ≈ 1.944 kts)
+            "Wind_Direction_deg": dir_i(interp_alt),
+        }
+    )
 
-# NOTE: This script operates fully offline after the forecast file is downloaded.
-#       No external polling (e.g., from open websites) is required at runtime.
-#       This may offer improved operational security in field or tactical settings.
+    # Step 7: Display results in a formatted table
+    forecast_time = get_forecast_time(forecast_hour, model_type)
+    print(f"\n{model_type.upper()} Wind Profile for {lat:.4f}°N, {lon:.4f}°E")
+    print(f"Forecast: {forecast_time}")
+    print("=" * 60)
+    print(df.to_string(index=False))
+
+    # NOTE: This script operates fully offline after the forecast file is downloaded.
+    #       No external polling (e.g., from open websites) is required at runtime.
+    #       This may offer improved operational security in field or tactical settings.
+
+
+if __name__ == "__main__":
+    main()
 
